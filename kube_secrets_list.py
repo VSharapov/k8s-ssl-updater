@@ -9,6 +9,12 @@ def cli():
     'A script to list Kubernetes secrets within a specified namespace'
     pass
 
+def load_config():
+    try:
+        config.load_incluster_config()
+    except:
+        config.load_kube_config()
+
 def get_namespaces():
     file_path = "namespaces-list.json"
     
@@ -17,7 +23,7 @@ def get_namespaces():
         with open(file_path, 'r') as file:
             return json.load(file)
     
-    config.load_kube_config()
+    load_config()
     v1 = client.CoreV1Api()
     namespaces = [ns.metadata.name for ns in v1.list_namespace().items]
 
@@ -31,7 +37,7 @@ def get_namespaces():
 @click.option('--namespace', prompt='Select a namespace', type=click.Choice(get_namespaces()), default='default')
 def list_secrets(namespace):
     'List the names of all secrets in the selected namespace'
-    config.load_kube_config()
+    load_config()
     v1 = client.CoreV1Api()
     print(f"Listing secrets in namespace {namespace}:")
     secrets = v1.list_namespaced_secret(namespace=namespace)
