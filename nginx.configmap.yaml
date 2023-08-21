@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes 1;
+    events {
+      worker_connections 1024;
+    }
+    http {
+      server {
+        listen 4000;
+        location / {
+            # Serve a blank page
+            return 204;
+        }
+
+        location /k8s-ssl-updater/ {
+            alias /usr/share/nginx/html/k8s-ssl-updater/;
+            try_files $uri $uri/ /k8s-ssl-updater/index.html;
+        }
+
+        location /k8s-ssl-updater/cli/ {
+            proxy_pass http://localhost:5000/;
+        }
+
+        location /k8s-ssl-updater/upload/ {
+            proxy_pass http://localhost:6000/;
+        }
+      }
+    }

@@ -13,6 +13,13 @@ spec:
         app: my-app
     spec:
       serviceAccountName: secrets-lister
+      volumes:
+      - name: nginx-config-volume
+        configMap:
+          name: nginx-config
+      - name: nginx-landing-volume
+        configMap:
+          name: nginx-landing
       containers:
       - name: my-container
         image: alpine:latest
@@ -31,4 +38,24 @@ spec:
           requests:
             cpu: 100m
             memory: 64Mi
-
+      - name: nginx
+        image: nginx:latest
+        resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        volumeMounts:
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nginx-landing-volume
+          mountPath: /usr/share/nginx/html/k8s-ssl-updater/index.html
+          subPath: index.html
+        volumeMounts:
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/conf.d
+        - name: nginx-landing-volume
+          mountPath: /usr/share/nginx/html/k8s-ssl-updater
