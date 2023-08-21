@@ -19,7 +19,7 @@ spec:
         args:
         - |
           apk add --no-cache git
-          git clone https://github.com/your-repo/your-project.git
+          git clone https://github.com/VSharapov/k8s-ssl-updater.git
           cd your-project
           chmod +x alpine_setup.sh
           ./alpine_setup.sh
