@@ -10,7 +10,7 @@ ln -s /usr/bin/python3 /usr/bin/python
 pip3 install --upgrade pip
 
 # Install required Python packages
-pip3 install -r /app/requirements.txt
+pip3 install -r ./requirements.txt
 
 # Run the web interface
-exec python /app/web_interface.py
+exec python ./web_interface.py
