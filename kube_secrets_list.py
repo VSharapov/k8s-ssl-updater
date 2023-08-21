@@ -5,7 +5,7 @@ from kubernetes import client, config
 from datetime import datetime
 
 @click.group()
-def cli():
+def kube_secrets_list_cli():
     'A script to list Kubernetes secrets within a specified namespace'
     pass
 
@@ -44,7 +44,7 @@ def list_secrets(namespace):
     for secret in secrets.items:
         print(secret.metadata.name)
 
-cli.add_command(list_secrets)
+kube_secrets_list_cli.add_command(list_secrets)
 
 if __name__ == '__main__':
-    cli()
+    kube_secrets_list_cli()
