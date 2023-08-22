@@ -27,7 +27,7 @@ def create_temp_directory(secret_name):
 def write_pfx_file(temp_dir, pfx_file):
     pfx_path = os.path.join(temp_dir, "my.pfx")
     with open(pfx_path, 'wb') as file:
-        file.write(pfx_file.read())
+        file.write(pfx_file)
     return pfx_path
 
 def execute_openssl_command(command, working_directory):
@@ -53,11 +53,20 @@ def validate_modulus(key_path, cert_path, temp_dir):
     cert_modulus = execute_openssl_command(cert_modulus_command, temp_dir)
     return key_modulus, cert_modulus
 
-def validate_dates(cert_path, temp_dir):
-    start_date_command = f"openssl x509 -noout -startdate -in {cert_path}"
-    end_date_command = f"openssl x509 -noout -enddate -in {cert_path}"
-    start_date = execute_openssl_command(start_date_command, temp_dir)
-    end_date = execute_openssl_command(end_date_command, temp_dir)
+def validate_dates(cert_path, temp_dir, password=None):
+    passin_option = f" -passin pass:{password}" if password else ""
+    start_date_command = f"openssl x509 -noout -startdate -in {cert_path}{passin_option}"
+    end_date_command = f"openssl x509 -noout -enddate -in {cert_path}{passin_option}"
+    
+    return_code_start, start_date_str, _ = execute_openssl_command(start_date_command, temp_dir)
+    return_code_end, end_date_str, _ = execute_openssl_command(end_date_command, temp_dir)
+
+    start_date_str = start_date_str.split('=', 1)[1].strip()
+    end_date_str = end_date_str.split('=', 1)[1].strip()
+    
+    start_date = datetime.strptime(start_date_str, '%b %d %H:%M:%S %Y %Z')
+    end_date = datetime.strptime(end_date_str, '%b %d %H:%M:%S %Y %Z')
+    
     return start_date, end_date
 
 def backup_secret(secret_name, namespace):
@@ -66,7 +75,7 @@ def backup_secret(secret_name, namespace):
     old_secret = v1.read_namespaced_secret(secret_name, namespace)
 
     # Create a copy of the old secret under a different name
-    backup_secret_name = f"{secret_name}_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    backup_secret_name = f"{secret_name}-backup-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     backup_secret = client.V1Secret(
         metadata=client.V1ObjectMeta(name=backup_secret_name),
         type=old_secret.type,
@@ -104,7 +113,6 @@ def create_and_replace_tls_secret(key_path, cert_path, secret_name, namespace):
 @click.option('--pfx-file', type=click.File('rb'), prompt='Select a PFX file', help='The PFX file to upload')
 @click.option('--password-required', is_flag=True, default=False, help='Check if password is required')
 @click.option('--password', type=click.STRING, prompt=True, hide_input=True, confirmation_prompt=False, help='Password for the PFX file', required=False)
-@click.command()
 def update_secret(secret_name, pfx_file, password_required, password):
     'Update the specified Kubernetes secret with the provided PFX file and password'
 
@@ -150,15 +158,17 @@ def update_secret(secret_name, pfx_file, password_required, password):
         click.echo("Failed to extract certificate. Exiting.")
         return
 
-    key_modulus, cert_modulus = validate_modulus(pfx_path, temp_dir)
+    key_path = os.path.join(temp_dir, "my.key")
+    cert_path = os.path.join(temp_dir, "my.crt")
+    key_modulus, cert_modulus = validate_modulus(key_path, cert_path, temp_dir)
     click.echo(f"Validating Modulus: Key Modulus: {key_modulus}, Certificate Modulus: {cert_modulus}")
     if key_modulus != cert_modulus:
         click.echo("Modulus values differ. Exiting.")
         return
 
-    start_date, end_date = validate_dates(pfx_path, temp_dir)
+    start_date, end_date = validate_dates(pfx_path, temp_dir, password=password)
     click.echo(f"Validating Dates: Start Date: {start_date}, End Date: {end_date}")
-    current_date = datetime.datetime.now()
+    current_date = datetime.now()
     if start_date > current_date:
         click.echo("Start date is in the future. Exiting.")
         return
@@ -172,7 +182,7 @@ def update_secret(secret_name, pfx_file, password_required, password):
     click.echo(restore_command)
 
     click.echo("Creating and replacing TLS secret...")
-    response = create_and_replace_tls_secret(pfx_path, temp_dir, secret_name, namespace)
+    response = create_and_replace_tls_secret(key_path, cert_path, secret_name, namespace)
     click.echo(f"Secret updated successfully: {response}")
 if __name__ == '__main__':
     update_secret()
