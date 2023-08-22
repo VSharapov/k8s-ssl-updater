@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Ensure Python and pip are installed
-apk add --no-cache python3 py3-pip
+apk add --no-cache python3 py3-pip openssl
 
 # Create a symbolic link for python
 ln -s /usr/bin/python3 /usr/bin/python

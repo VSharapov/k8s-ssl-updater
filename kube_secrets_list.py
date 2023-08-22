@@ -4,11 +4,6 @@ import os
 from kubernetes import client, config
 from datetime import datetime
 
-@click.group()
-def kube_secrets_list_cli():
-    'A script to list Kubernetes secrets within a specified namespace'
-    pass
-
 def load_config():
     try:
         config.load_incluster_config()
@@ -17,8 +12,6 @@ def load_config():
 
 def get_namespaces():
     file_path = "namespaces-list.json"
-    
-    # Check if file exists and is less than 5 minutes old
     if os.path.exists(file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(file_path))).seconds < 300:
         with open(file_path, 'r') as file:
             return json.load(file)
@@ -27,24 +20,34 @@ def get_namespaces():
     v1 = client.CoreV1Api()
     namespaces = [ns.metadata.name for ns in v1.list_namespace().items]
 
-    # Update the file with the latest namespaces
     with open(file_path, 'w') as file:
         json.dump(namespaces, file)
 
     return namespaces
 
-@click.command()
-@click.option('--namespace', prompt='Select a namespace', type=click.Choice(get_namespaces()), default='default')
-def list_secrets(namespace):
-    'List the names of all secrets in the selected namespace'
+def get_secrets_list(namespace='all-namespaces'):
     load_config()
     v1 = client.CoreV1Api()
-    print(f"Listing secrets in namespace {namespace}:")
-    secrets = v1.list_namespaced_secret(namespace=namespace)
-    for secret in secrets.items:
-        print(secret.metadata.name)
+    secrets = []
 
-kube_secrets_list_cli.add_command(list_secrets)
+    if namespace == 'all-namespaces':
+        selected_namespaces = get_namespaces()
+    else:
+        selected_namespaces = [namespace]
+    for ns in selected_namespaces:
+        k8s_secrets = v1.list_namespaced_secret(namespace=ns)
+        secrets = secrets + [{'name': x.metadata.name, 'namespace': ns} for x in k8s_secrets.items]
+
+    return secrets
+
+@click.command()
+@click.option('--namespace', prompt='Select a namespace', type=click.Choice(['all-namespaces'] + get_namespaces()), default='all-namespaces')
+def list_secrets(namespace):
+    'List the names of all secrets in the selected namespace or all namespaces'
+    secrets = get_secrets_list(namespace)
+    print(f"Listing secrets in namespace {namespace}:")
+    for s in secrets:
+        print(s)
 
 if __name__ == '__main__':
-    kube_secrets_list_cli()
+    list_secrets()
